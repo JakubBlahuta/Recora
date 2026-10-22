@@ -283,7 +283,7 @@ public sealed class SqliteCatalogRepository : ICatalogRepository, IAsyncDisposab
         cmd.CommandText = """
             UPDATE upload_jobs
             SET status = $status,
-                attempt_count = attempt_count + CASE WHEN $status = 'Uploading' OR $status = 'Failed' THEN 1 ELSE 0 END,
+                attempt_count = attempt_count + CASE WHEN $status = 'Uploading' THEN 1 ELSE 0 END,
                 last_error = $err,
                 updated_at = $at
             WHERE meeting_id = $id;

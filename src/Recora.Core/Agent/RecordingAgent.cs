@@ -195,6 +195,7 @@ public sealed class RecordingAgent : IAsyncDisposable
         };
 
         await _catalog.UpsertMeetingAsync(_active, ct).ConfigureAwait(false);
+        await SessionRecovery.WriteSessionJournalAsync(dir, _active, ct).ConfigureAwait(false);
 
         var encodeRequest = new EncodingSessionRequest
         {
@@ -211,6 +212,9 @@ public sealed class RecordingAgent : IAsyncDisposable
 
         _encoding = await _encodingFactory(encodeRequest).ConfigureAwait(false);
         _capture = _captureFactory();
+
+        _capture.GapDetected += OnCaptureGap;
+
         await _capture.StartAsync(new CaptureStartRequest
         {
             MeetingId = meetingId,
@@ -225,6 +229,12 @@ public sealed class RecordingAgent : IAsyncDisposable
         _logger?.LogInformation("Recording started {MeetingId}", meetingId);
     }
 
+    private void OnCaptureGap(object? sender, CaptureGapEventArgs e)
+    {
+        _logger?.LogWarning("Capture gap: {Reason}", e.Reason);
+        _ = _encoding?.TickAsync(); // keep clock moving; gap recorded by encoding bridge if supported
+    }
+
     private async Task StopRecordingAsync(bool recovered, CancellationToken ct)
     {
         State = TrayAgentState.Stopping;
@@ -232,6 +242,7 @@ public sealed class RecordingAgent : IAsyncDisposable
 
         if (_capture is not null)
         {
+            _capture.GapDetected -= OnCaptureGap;
             await _capture.StopAsync(ct).ConfigureAwait(false);
             await _capture.DisposeAsync().ConfigureAwait(false);
             _capture = null;
@@ -256,11 +267,8 @@ public sealed class RecordingAgent : IAsyncDisposable
             _active.Status = recovered ? MeetingStatus.Recovered : MeetingStatus.Local;
             if (sidecar is not null)
             {
-                _active.TotalBytes = sidecar.Chunks.Sum(c =>
-                {
-                    var path = Path.Combine(_active.LocalPath, c.File);
-                    return File.Exists(path) ? new FileInfo(path).Length : 0;
-                });
+                _active.TotalBytes = SessionRecovery.SumChunkBytes(_active.LocalPath, sidecar);
+                await SessionRecovery.IndexSidecarAsync(_catalog, _active, sidecar, ct).ConfigureAwait(false);
             }
 
             await _catalog.UpsertMeetingAsync(_active, ct).ConfigureAwait(false);
@@ -279,17 +287,17 @@ public sealed class RecordingAgent : IAsyncDisposable
         RaiseState();
     }
 
+    /// <summary>
+    /// Injected recovery for on-disk sidecars. Default no-op rewrite — EncodingCoordinator.RecoverOrphanAsync wired by host.
+    /// </summary>
+    public Func<string, CancellationToken, Task<MeetingSidecar?>>? DirectoryRecoverer { get; set; }
+
     private async Task RecoverOrphansAsync(CancellationToken ct)
     {
-        var orphans = await _catalog.ListOrphanRecordingSessionsAsync(ct).ConfigureAwait(false);
-        foreach (var orphan in orphans)
-        {
-            _logger?.LogWarning("Recovering orphan session {Id}", orphan.MeetingId);
-            orphan.Status = MeetingStatus.Recovered;
-            orphan.Recovered = true;
-            orphan.EndedAt ??= DateTimeOffset.UtcNow;
-            await _catalog.UpsertMeetingAsync(orphan, ct).ConfigureAwait(false);
-        }
+        var recoverer = DirectoryRecoverer ?? ((_, _) => Task.FromResult<MeetingSidecar?>(null));
+        var recovered = await SessionRecovery.RecoverAllAsync(_catalog, recoverer, ct).ConfigureAwait(false);
+        foreach (var orphan in recovered)
+            _logger?.LogWarning("Recovered orphan session {Id} recovered={Flag}", orphan.MeetingId, orphan.Recovered);
     }
 
     private static string CleanTitle(string title)

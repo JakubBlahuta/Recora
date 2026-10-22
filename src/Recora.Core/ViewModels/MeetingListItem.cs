@@ -1,7 +1,7 @@
 using Recora.Core.Localization;
 using Recora.Core.Models;
 
-namespace Recora.App.ViewModels;
+namespace Recora.Core.ViewModels;
 
 public sealed class MeetingListItem
 {

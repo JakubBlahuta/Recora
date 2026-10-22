@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
+using Recora.App.Services;
 using Recora.App.Views;
 using Recora.Core.Localization;
 using Recora.Core.Settings;
@@ -10,19 +11,22 @@ public sealed partial class MainWindow : Window
 {
     private readonly ServiceProvider _services;
     private readonly SettingsStore _settings;
+    private readonly NavigationService _nav;
 
     public MainWindow(ServiceProvider services, bool showWizard)
     {
         _services = services;
         _settings = services.GetRequiredService<SettingsStore>();
+        _nav = services.GetService<NavigationService>() ?? new NavigationService();
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
+        _nav.Attach(ContentFrame, _services);
         ApplyLanguageChrome();
 
         if (showWizard || !_settings.Current.FirstRunCompleted)
-            ContentFrame.Navigate(typeof(WizardPage), _services);
+            _nav.Navigate(AppPage.Wizard);
         else
-            ContentFrame.Navigate(typeof(LibraryPage), _services);
+            _nav.Navigate(AppPage.Library);
     }
 
     private void ApplyLanguageChrome()
@@ -40,10 +44,10 @@ public sealed partial class MainWindow : Window
     }
 
     private void LibraryNav_Click(object sender, RoutedEventArgs e) =>
-        ContentFrame.Navigate(typeof(LibraryPage), _services);
+        _nav.Navigate(AppPage.Library);
 
     private void SettingsNav_Click(object sender, RoutedEventArgs e) =>
-        ContentFrame.Navigate(typeof(SettingsPage), _services);
+        _nav.Navigate(AppPage.Settings);
 
     public void RefreshChrome() => ApplyLanguageChrome();
 }

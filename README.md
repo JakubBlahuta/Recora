@@ -76,8 +76,10 @@ dotnet run --project src\Recora.App\Recora.App.csproj
 ### Libraries + tests (any OS)
 
 ```bash
-dotnet test tests/Recora.Core.Tests/Recora.Core.Tests.csproj -c Release
+dotnet test Recora.Libraries.slnf -c Release
 ```
+
+Step-by-step VS workloads: [`docs/windows-build.md`](docs/windows-build.md).
 
 ### MSIX (per-user, no admin)
 
@@ -88,33 +90,60 @@ dotnet test tests/Recora.Core.Tests/Recora.Core.Tests.csproj -c Release
 
 Users install into their profile; no UAC for normal install/update.
 
-## OneDrive OAuth
-
-Set a public-client application ID (user-provided secret):
+### Demo without Teams (Windows or CI-style)
 
 ```powershell
-$env:RECORA_MSAL_CLIENT_ID = "<azure-app-client-id>"
+$env:RECORA_FAKE_CAPTURE = "1"
+# then run Recora.App — Force record uses FakeCaptureSession + deterministic chunks
 ```
 
-Scopes (planned): `offline_access`, `Files.ReadWrite`, `User.Read`.
+## OneDrive OAuth
 
-Without a client ID, the app uses an **offline stub token** so wizard + upload queue can be exercised locally. Tokens are stored under `config\secrets` via DPAPI.
+### Default (no Azure app yet)
+
+Without `RECORA_MSAL_CLIENT_ID`, or with `cloud.useMsal: false` in settings, **Sign in** stores a **stub token** (DPAPI under `config\secrets`). The upload queue runs end-to-end locally; nothing is sent to Microsoft.
+
+### Azure app registration (for real Graph upload)
+
+1. Open [Azure Portal → App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) → **New registration**.  
+2. Name: `Recora` (or similar).  
+3. Supported account types: **Personal Microsoft accounts only** (or “Accounts in any org + personal” if you need both).  
+4. Redirect URI: platform **Mobile and desktop applications** → check  
+   `https://login.microsoftonline.com/common/oauth2/nativeclient`  
+   and/or add `http://localhost` (MSAL loopback).  
+5. Register → copy **Application (client) ID**.  
+6. **Authentication** → enable **Allow public client flows** = **Yes** (device/public client).  
+7. **API permissions** → Microsoft Graph **delegated**:  
+   - `User.Read`  
+   - `Files.ReadWrite`  
+   - (MSAL also requests `offline_access` for refresh)  
+   No admin consent required for personal OneDrive.  
+8. On the PC:
+
+```powershell
+$env:RECORA_MSAL_CLIENT_ID = "<application-client-id>"
+```
+
+9. In Recora Settings / `settings.json`, set `"cloud": { "useMsal": true, ... }`.  
+10. MSAL interactive browser wiring is still a follow-up on Windows (`NotImplementedException` until implemented); the flag + env gate is ready.
+
+Tokens always stay in `%LOCALAPPDATA%\Recora\config\secrets` via DPAPI — never in the repo.
 
 ## What works vs stubbed
 
 | Area | Status |
 |------|--------|
-| Settings / paths / i18n catalog | **Works** |
-| SQLite catalog + search | **Works** (tested) |
-| Teams title heuristics L2 | **Works** (tested); L1 EnumWindows on Windows |
-| Recording agent state machine | **Works** |
-| Chunk sidecars + crash orphan finalize | **Works** (placeholder MP4 bytes) |
-| OneDrive upload queue | **Works** with stub token; Graph PUT ready when MSAL wired |
+| Settings / paths / i18n / viewmodels | **Works** (tested) |
+| SQLite catalog + search + upload jobs | **Works** (tested) |
+| Teams L2 heuristics + debounce | **Works** (tested); L1 EnumWindows on Windows |
+| Recording agent + crash recovery reindex | **Works** (tested) |
+| Fake capture + deterministic chunks | **Works** for E2E demos/tests |
+| OneDrive queue + retry/backoff | **Works** with stub token |
 | WinUI wizard / library / settings | **Source complete** — build on Windows |
 | Tray (H.NotifyIcon) | **Source complete** — Windows |
 | WinRT Graphics Capture + real WASAPI PCM | **Armed / spike stubs** — bind COM on Windows |
-| Media Foundation / FFmpeg encode | **Stub** — replace placeholder chunk writer |
-| MSAL interactive browser | **Blocked** on missing `RECORA_MSAL_CLIENT_ID` |
+| Media Foundation / FFmpeg encode | **Stub** — deterministic placeholder until MF/FFmpeg |
+| MSAL interactive browser | **Gated** — needs `RECORA_MSAL_CLIENT_ID` + `useMsal` + Windows MSAL wire-up |
 
 ## CI notes
 

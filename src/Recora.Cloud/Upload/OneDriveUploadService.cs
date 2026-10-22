@@ -5,7 +5,7 @@ using Recora.Core.Models;
 namespace Recora.Cloud.Upload;
 
 /// <summary>
-/// Upload queue worker: pending → uploading → done | failed with retry.
+/// Upload queue worker: pending → uploading → done | failed with retry + backoff.
 /// Graph PUT /me/drive/root:/{folder}/{meetingId}/{file}:/content (stubbed without live token).
 /// </summary>
 public sealed class OneDriveUploadService : IOneDriveUploadService
@@ -38,7 +38,11 @@ public sealed class OneDriveUploadService : IOneDriveUploadService
                 return name.StartsWith("chunk_", StringComparison.OrdinalIgnoreCase)
                        || name is "meeting.json" or "chunks.jsonl";
             })
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        if (files.Count == 0)
+            throw new InvalidOperationException("No meeting files to upload.");
 
         _logger?.LogInformation(
             "Uploading {Count} files for {MeetingId} to OneDrive/{Folder}/{MeetingFolder}",
@@ -56,17 +60,13 @@ public sealed class OneDriveUploadService : IOneDriveUploadService
 
     private async Task UploadFileAsync(string accessToken, string localPath, string graphPath, CancellationToken ct)
     {
-        // Stub: when token is the stub marker, simulate success without network.
         if (accessToken.StartsWith("stub-", StringComparison.Ordinal))
         {
             _logger?.LogInformation("Stub upload OK {Path} ({Bytes} bytes)", graphPath, new FileInfo(localPath).Length);
-            await Task.Delay(10, ct).ConfigureAwait(false);
+            await Task.Delay(5, ct).ConfigureAwait(false);
             return;
         }
 
-        // Real Graph upload session:
-        // PUT https://graph.microsoft.com/v1.0/me/drive/root:/{graphPath}:/content
-        // For large files: createUploadSession + fragment upload with resume.
         using var http = new HttpClient();
         http.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
@@ -75,7 +75,7 @@ public sealed class OneDriveUploadService : IOneDriveUploadService
         using var content = new StreamContent(stream);
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
 
-        var url = $"https://graph.microsoft.com/v1.0/me/drive/root:/{graphPath}:/content";
+        var url = $"https://graph.microsoft.com/v1.0/me/drive/root:/{Uri.EscapeDataString(graphPath).Replace("%2F", "/")}:/content";
         using var response = await http.PutAsync(url, content, ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
@@ -87,10 +87,13 @@ public sealed class OneDriveUploadService : IOneDriveUploadService
 
 public sealed class UploadQueueWorker
 {
+    public const int DefaultMaxAttempts = 5;
+
     private readonly ICatalogRepository _catalog;
     private readonly IOneDriveUploadService _upload;
     private readonly IOneDriveAuthService _auth;
     private readonly Func<string> _folderPath;
+    private readonly Func<bool> _autoUploadEnabled;
     private readonly ILogger? _logger;
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -100,14 +103,20 @@ public sealed class UploadQueueWorker
         IOneDriveUploadService upload,
         IOneDriveAuthService auth,
         Func<string> folderPath,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        Func<bool>? autoUploadEnabled = null)
     {
         _catalog = catalog;
         _upload = upload;
         _auth = auth;
         _folderPath = folderPath;
+        _autoUploadEnabled = autoUploadEnabled ?? (() => true);
         _logger = logger;
     }
+
+    public int MaxAttempts { get; set; } = DefaultMaxAttempts;
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(10);
+    public int LastProcessedCount { get; private set; }
 
     public void Start()
     {
@@ -125,6 +134,47 @@ public sealed class UploadQueueWorker
             try { await _loop.ConfigureAwait(false); }
             catch (OperationCanceledException) { }
         }
+
+        _loop = null;
+        _cts.Dispose();
+        _cts = null;
+    }
+
+    /// <summary>Process all currently pending/failed jobs once (tests + manual drain).</summary>
+    public async Task<int> ProcessPendingOnceAsync(CancellationToken ct = default)
+    {
+        if (!_autoUploadEnabled() || !_auth.IsAuthenticated)
+        {
+            LastProcessedCount = 0;
+            return 0;
+        }
+
+        var jobs = await _catalog.ListPendingUploadsAsync(ct).ConfigureAwait(false);
+        var processed = 0;
+        foreach (var job in jobs)
+        {
+            if (job.AttemptCount >= MaxAttempts)
+            {
+                _logger?.LogWarning("Giving up on upload {MeetingId} after {Attempts} attempts",
+                    job.MeetingId, job.AttemptCount);
+                continue;
+            }
+
+            // Simple exponential backoff based on attempt count (persisted in SQLite)
+            if (job.AttemptCount > 0)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, job.AttemptCount)));
+                var since = DateTimeOffset.UtcNow - job.UpdatedAt;
+                if (since < delay)
+                    continue;
+            }
+
+            await ProcessJobAsync(job.MeetingId, ct).ConfigureAwait(false);
+            processed++;
+        }
+
+        LastProcessedCount = processed;
+        return processed;
     }
 
     private async Task RunAsync(CancellationToken ct)
@@ -133,18 +183,7 @@ public sealed class UploadQueueWorker
         {
             try
             {
-                if (!_auth.IsAuthenticated)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
-                    continue;
-                }
-
-                var jobs = await _catalog.ListPendingUploadsAsync(ct).ConfigureAwait(false);
-                foreach (var job in jobs)
-                {
-                    if (job.AttemptCount >= 5) continue;
-                    await ProcessJobAsync(job.MeetingId, ct).ConfigureAwait(false);
-                }
+                await ProcessPendingOnceAsync(ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -152,7 +191,7 @@ public sealed class UploadQueueWorker
                 _logger?.LogWarning(ex, "Upload queue iteration failed");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
+            await Task.Delay(PollInterval, ct).ConfigureAwait(false);
         }
     }
 
@@ -167,8 +206,10 @@ public sealed class UploadQueueWorker
             await _upload.UploadMeetingAsync(meeting, _folderPath(), ct).ConfigureAwait(false);
             meeting.Status = MeetingStatus.Synced;
             meeting.CloudPath = $"{_folderPath().Trim('/')}/{meeting.MeetingId}";
+            meeting.ErrorMessage = null;
             await _catalog.UpsertMeetingAsync(meeting, ct).ConfigureAwait(false);
             await _catalog.UpdateUploadStatusAsync(meetingId, UploadJobStatus.Done, null, ct).ConfigureAwait(false);
+            _logger?.LogInformation("Upload done {MeetingId} → {CloudPath}", meetingId, meeting.CloudPath);
         }
         catch (Exception ex)
         {

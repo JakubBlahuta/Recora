@@ -43,13 +43,21 @@ public sealed class AppServices
 
     public RecordingAgent CreateAgent()
     {
-        return new RecordingAgent(
+        var useFake = string.Equals(
+            Environment.GetEnvironmentVariable("RECORA_FAKE_CAPTURE"), "1", StringComparison.Ordinal);
+
+        var agent = new RecordingAgent(
             _paths,
             _settings,
             _detector,
             _catalog,
-            () => _capture.CreateSession(),
-            async request => await EncodingHost.StartBridgeAsync(_encoding, request).ConfigureAwait(false),
+            () => useFake ? new FakeCaptureSession() : _capture.CreateSession(),
+            async request => useFake
+                ? await DeterministicEncodingHost.StartAsync(_encoding, request, _catalog).ConfigureAwait(false)
+                : await EncodingHost.StartBridgeAsync(_encoding, request).ConfigureAwait(false),
             _loggerFactory.CreateLogger<RecordingAgent>());
+
+        agent.DirectoryRecoverer = EncodingCoordinator.RecoverOrphanAsync;
+        return agent;
     }
 }

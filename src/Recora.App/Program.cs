@@ -54,8 +54,16 @@ public static class Program
         services.AddSingleton<IAudioDeviceEnumerator, WasapiMicrophoneEnumerator>();
         services.AddSingleton<EncodingCoordinator>();
         services.AddSingleton<ISecretStore, DpapiSecretStore>();
-        services.AddSingleton<IOneDriveAuthService, OneDriveAuthService>();
+        services.AddSingleton<IOneDriveAuthService>(sp =>
+        {
+            var settings = sp.GetRequiredService<SettingsStore>();
+            return new OneDriveAuthService(
+                sp.GetRequiredService<ISecretStore>(),
+                sp.GetService<ILogger<OneDriveAuthService>>(),
+                () => settings.Current.Cloud.UseMsal);
+        });
         services.AddSingleton<IOneDriveUploadService, OneDriveUploadService>();
+        services.AddSingleton<NavigationService>();
         services.AddSingleton<AppServices>();
         services.AddSingleton(sp =>
         {
@@ -70,7 +78,8 @@ public static class Program
                 sp.GetRequiredService<IOneDriveUploadService>(),
                 sp.GetRequiredService<IOneDriveAuthService>(),
                 () => settings.Current.Cloud.FolderPath,
-                sp.GetService<ILogger<UploadQueueWorker>>());
+                sp.GetService<ILogger<UploadQueueWorker>>(),
+                () => settings.Current.Cloud.AutoUpload);
         });
 
         return services.BuildServiceProvider();

@@ -6,7 +6,8 @@ namespace Recora.Cloud.OAuth;
 
 /// <summary>
 /// Microsoft identity OAuth scaffolding for personal OneDrive (Graph).
-/// Real interactive browser flow requires ClientId from Azure app registration (user secret).
+/// MSAL interactive flow is gated on <see cref="ClientIdConfigKey"/> + optional UseMsal flag.
+/// Without a client id, SignIn stores a stub token so queue/UI demos work offline.
 /// </summary>
 public sealed class OneDriveAuthService : IOneDriveAuthService
 {
@@ -15,29 +16,37 @@ public sealed class OneDriveAuthService : IOneDriveAuthService
 
     private readonly ISecretStore _secrets;
     private readonly ILogger<OneDriveAuthService>? _logger;
+    private readonly Func<bool> _useMsal;
     private TokenBundle? _cached;
 
-    public OneDriveAuthService(ISecretStore secrets, ILogger<OneDriveAuthService>? logger = null)
+    public OneDriveAuthService(
+        ISecretStore secrets,
+        ILogger<OneDriveAuthService>? logger = null,
+        Func<bool>? useMsal = null)
     {
         _secrets = secrets;
         _logger = logger;
+        _useMsal = useMsal ?? (() => true);
     }
 
     public bool IsAuthenticated => _cached?.AccessToken is not null || HasPersistedToken();
+
+    public bool IsStubSession => _cached?.IsStub == true || PeekStub();
 
     public string? ClientId =>
         Environment.GetEnvironmentVariable(ClientIdConfigKey)
         ?? Environment.GetEnvironmentVariable("Recora__OneDrive__ClientId");
 
+    public bool CanUseMsal => _useMsal() && !string.IsNullOrWhiteSpace(ClientId);
+
     public async Task<bool> SignInAsync(CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(ClientId))
+        if (!CanUseMsal)
         {
             _logger?.LogWarning(
-                "OneDrive OAuth stub: set {Env} (Azure public client app id) to enable real sign-in",
+                "OneDrive stub sign-in (set {Env} and cloud.useMsal=true for real MSAL)",
                 ClientIdConfigKey);
 
-            // Dev stub: mark as signed-in with placeholder so UI/queue can be exercised offline.
             var stub = new TokenBundle
             {
                 AccessToken = "stub-access-token",
@@ -51,11 +60,9 @@ public sealed class OneDriveAuthService : IOneDriveAuthService
             return true;
         }
 
-        // Production path (Windows): MSAL PublicClientApplication interactive + Files.ReadWrite
-        // scopes: offline_access Files.ReadWrite User.Read
         _logger?.LogInformation("MSAL interactive sign-in would start with client {ClientId}", ClientId);
         throw new NotImplementedException(
-            "Wire MSAL PublicClientApplication on Windows once RECORA_MSAL_CLIENT_ID is provided.");
+            "Wire MSAL PublicClientApplication on Windows once RECORA_MSAL_CLIENT_ID is provided. See README Azure app registration.");
     }
 
     public async Task SignOutAsync(CancellationToken ct = default)
@@ -73,6 +80,21 @@ public sealed class OneDriveAuthService : IOneDriveAuthService
         if (json is null) return null;
         _cached = JsonSerializer.Deserialize<TokenBundle>(json);
         return _cached?.AccessToken;
+    }
+
+    private bool PeekStub()
+    {
+        try
+        {
+            var json = _secrets.LoadAsync(TokenSecretKey).GetAwaiter().GetResult();
+            if (json is null) return false;
+            var bundle = JsonSerializer.Deserialize<TokenBundle>(json);
+            return bundle?.IsStub == true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private bool HasPersistedToken()

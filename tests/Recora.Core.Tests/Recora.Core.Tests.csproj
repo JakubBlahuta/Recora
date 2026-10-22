@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\Recora.Encoding\Recora.Encoding.csproj" />
     <ProjectReference Include="..\..\src\Recora.Cloud\Recora.Cloud.csproj" />
     <ProjectReference Include="..\..\src\Recora.Detection\Recora.Detection.csproj" />
+    <ProjectReference Include="..\..\src\Recora.Capture\Recora.Capture.csproj" />
   </ItemGroup>
 
 </Project>

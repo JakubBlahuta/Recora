@@ -70,7 +70,7 @@ public sealed class ChunkSidecarEntry
     public string? Sha256 { get; set; }
 }
 
-public sealed class DetectionResult
+public sealed record DetectionResult
 {
     public bool IsInCall { get; init; }
     public DetectionConfidence Confidence { get; init; }

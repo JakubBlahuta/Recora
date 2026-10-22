@@ -70,6 +70,12 @@ public sealed class CloudSettings
     public string FolderPath { get; set; } = "Recordings";
     public bool AutoUpload { get; set; } = true;
     public bool OAuthCompleted { get; set; }
+
+    /// <summary>
+    /// When true and RECORA_MSAL_CLIENT_ID is set, use interactive MSAL.
+    /// When false or client id missing, SignIn uses the local stub token for offline demos.
+    /// </summary>
+    public bool UseMsal { get; set; }
 }
 
 public sealed class FormaSettings

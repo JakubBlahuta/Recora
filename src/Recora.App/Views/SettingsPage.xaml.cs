@@ -6,15 +6,13 @@ using Recora.Core.Abstractions;
 using Recora.Core.Localization;
 using Recora.Core.Models;
 using Recora.Core.Settings;
+using Recora.Core.ViewModels;
 
 namespace Recora.App.Views;
 
 public sealed partial class SettingsPage : Page
 {
-    private ServiceProvider _services = null!;
-    private SettingsStore _settings = null!;
-    private IAudioDeviceEnumerator _devices = null!;
-    private IOneDriveAuthService _auth = null!;
+    private SettingsViewModel _vm = null!;
     private bool _loading;
 
     public SettingsPage()
@@ -24,47 +22,59 @@ public sealed partial class SettingsPage : Page
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
-        _services = (ServiceProvider)e.Parameter;
-        _settings = _services.GetRequiredService<SettingsStore>();
-        _devices = _services.GetRequiredService<IAudioDeviceEnumerator>();
-        _auth = _services.GetRequiredService<IOneDriveAuthService>();
+        var services = (ServiceProvider)e.Parameter;
+        _vm = new SettingsViewModel(
+            services.GetRequiredService<SettingsStore>(),
+            services.GetRequiredService<IAudioDeviceEnumerator>(),
+            services.GetRequiredService<IOneDriveAuthService>());
         Load();
     }
 
     private void Load()
     {
         _loading = true;
-        var s = _settings.Current;
         ApplyStrings();
         foreach (ComboBoxItem item in LanguageBox.Items)
         {
-            if ((string?)item.Tag == s.UiLanguage)
+            if ((string?)item.Tag == _vm.UiLanguage)
                 LanguageBox.SelectedItem = item;
         }
 
-        AutomationSwitch.IsOn = s.AutomationEnabled;
-        ChunkMinutes.Value = s.ChunkDurationMinutes;
-        MicSwitch.IsOn = s.Capture.IncludeMicrophone;
-        DoubleVoiceSwitch.IsOn = s.MitigateDoubleVoice;
-        FolderBox.Text = s.Cloud.FolderPath;
-        AutoUploadSwitch.IsOn = s.Cloud.AutoUpload;
+        AutomationSwitch.IsOn = _vm.AutomationEnabled;
+        ChunkMinutes.Value = _vm.ChunkDurationMinutes;
+        MicSwitch.IsOn = _vm.IncludeMicrophone;
+        DoubleVoiceSwitch.IsOn = _vm.MitigateDoubleVoice;
+        FolderBox.Text = _vm.FolderPath;
+        AutoUploadSwitch.IsOn = _vm.AutoUpload;
 
         MicDeviceBox.Items.Clear();
-        foreach (var d in _devices.ListMicrophones())
+        foreach (var d in _vm.Microphones)
         {
             var item = new ComboBoxItem { Content = d.DisplayName, Tag = d.Id };
             MicDeviceBox.Items.Add(item);
-            if (d.Id == s.Capture.MicrophoneDeviceId || (s.Capture.MicrophoneDeviceId == "default" && d.IsDefault))
+            if (d.Id == _vm.MicrophoneDeviceId || (_vm.MicrophoneDeviceId == "default" && d.IsDefault))
                 MicDeviceBox.SelectedItem = item;
         }
 
-        StatusText.Text = _auth.IsAuthenticated ? "OneDrive OK" : "OneDrive — not signed in";
+        StatusText.Text = _vm.AuthStatus;
         _loading = false;
     }
 
     private void ApplyStrings()
     {
-        var lang = _settings.Current.GetUiLanguage();
+        var lang = Enum.TryParse<UiLanguage>(
+            _vm.UiLanguage is "sk" ? "Sk" : _vm.UiLanguage is "en" ? "En" : "Cs",
+            out var parsed)
+            ? parsed
+            : UiLanguage.Cs;
+        // Prefer store language
+        lang = _vm.UiLanguage.ToLowerInvariant() switch
+        {
+            "sk" => UiLanguage.Sk,
+            "en" => UiLanguage.En,
+            _ => UiLanguage.Cs
+        };
+
         TitleText.Text = StringCatalog.Get("Settings.Title", lang);
         AutomationSwitch.Header = lang switch
         {
@@ -99,63 +109,58 @@ public sealed partial class SettingsPage : Page
     private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || LanguageBox.SelectedItem is not ComboBoxItem item || item.Tag is not string code) return;
-        _settings.Update(s => s.UiLanguage = code);
+        _vm.UiLanguage = code;
         ApplyStrings();
     }
 
     private void AutomationSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _settings.Update(s => s.AutomationEnabled = AutomationSwitch.IsOn);
+        _vm.AutomationEnabled = AutomationSwitch.IsOn;
     }
 
     private void ChunkMinutes_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
         if (_loading || double.IsNaN(args.NewValue)) return;
-        _settings.Update(s => s.ChunkDurationMinutes = (int)Math.Clamp(args.NewValue, 15, 30));
+        _vm.ChunkDurationMinutes = (int)args.NewValue;
     }
 
     private void MicSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _settings.Update(s =>
-        {
-            s.Capture.IncludeMicrophone = MicSwitch.IsOn;
-            s.Capture.Audio = MicSwitch.IsOn ? "teamsPlusMic" : "teamsOnly";
-        });
+        _vm.IncludeMicrophone = MicSwitch.IsOn;
     }
 
     private void MicDeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || MicDeviceBox.SelectedItem is not ComboBoxItem item || item.Tag is not string id) return;
-        _settings.Update(s => s.Capture.MicrophoneDeviceId = id);
+        _vm.MicrophoneDeviceId = id;
     }
 
     private void DoubleVoiceSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _settings.Update(s => s.MitigateDoubleVoice = DoubleVoiceSwitch.IsOn);
+        _vm.MitigateDoubleVoice = DoubleVoiceSwitch.IsOn;
     }
 
     private void FolderBox_LostFocus(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _settings.Update(s => s.Cloud.FolderPath = string.IsNullOrWhiteSpace(FolderBox.Text) ? "Recordings" : FolderBox.Text.Trim());
+        _vm.FolderPath = FolderBox.Text;
     }
 
     private void AutoUploadSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _settings.Update(s => s.Cloud.AutoUpload = AutoUploadSwitch.IsOn);
+        _vm.AutoUpload = AutoUploadSwitch.IsOn;
     }
 
     private async void SignInButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var ok = await _auth.SignInAsync().ConfigureAwait(true);
-            _settings.Update(s => s.Cloud.OAuthCompleted = ok);
-            StatusText.Text = ok ? "OneDrive OK" : "Sign-in failed";
+            await _vm.SignInAsync().ConfigureAwait(true);
+            StatusText.Text = _vm.AuthStatus;
         }
         catch (Exception ex)
         {
