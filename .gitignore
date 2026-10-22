@@ -1,0 +1,60 @@
+## .NET
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.rsuser
+project.lock.json
+project.fragment.lock.json
+artifacts/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+## Visual Studio / VS Code
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.DotSettings.user
+*.ncrunch*
+_NCrunch_*
+*.local.json
+
+## Windows / MSIX
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+*_TemporaryKey.pfx
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.appinstaller
+
+## OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Secrets / local config (never commit)
+**/secrets/
+*.pfx
+.env
+.env.*
+!*.env.example
+
+## Rider
+.idea/
+
+## NuGet
+packages/
+*.nupkg
+*.snupkg
