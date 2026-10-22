@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "Recora.App (unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": false,
+      "environmentVariables": {
+        "RECORA_FAKE_CAPTURE": "1"
+      }
+    },
+    "Recora.App (live capture)": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

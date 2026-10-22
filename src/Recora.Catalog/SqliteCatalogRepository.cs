@@ -22,6 +22,10 @@ public sealed class SqliteCatalogRepository : ICatalogRepository, IAsyncDisposab
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
+        if (_connection is { State: System.Data.ConnectionState.Open })
+            return;
+
+        _connection?.Dispose();
         _connection = new SqliteConnection(_connectionString);
         await _connection.OpenAsync(ct).ConfigureAwait(false);
 

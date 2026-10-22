@@ -3,8 +3,10 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using Recora.Core.Abstractions;
+using Recora.Core.Demo;
 using Recora.Core.Localization;
 using Recora.Core.Models;
+using Recora.Core.Paths;
 using Recora.Core.Settings;
 using Recora.Core.ViewModels;
 
@@ -12,6 +14,7 @@ namespace Recora.App.Views;
 
 public sealed partial class SettingsPage : Page
 {
+    private ServiceProvider _services = null!;
     private SettingsViewModel _vm = null!;
     private bool _loading;
 
@@ -22,11 +25,11 @@ public sealed partial class SettingsPage : Page
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
-        var services = (ServiceProvider)e.Parameter;
+        _services = (ServiceProvider)e.Parameter;
         _vm = new SettingsViewModel(
-            services.GetRequiredService<SettingsStore>(),
-            services.GetRequiredService<IAudioDeviceEnumerator>(),
-            services.GetRequiredService<IOneDriveAuthService>());
+            _services.GetRequiredService<SettingsStore>(),
+            _services.GetRequiredService<IAudioDeviceEnumerator>(),
+            _services.GetRequiredService<IOneDriveAuthService>());
         Load();
     }
 
@@ -46,6 +49,7 @@ public sealed partial class SettingsPage : Page
         DoubleVoiceSwitch.IsOn = _vm.MitigateDoubleVoice;
         FolderBox.Text = _vm.FolderPath;
         AutoUploadSwitch.IsOn = _vm.AutoUpload;
+        DemoDataSwitch.IsOn = _vm.DemoDataEnabled;
 
         MicDeviceBox.Items.Clear();
         foreach (var d in _vm.Microphones)
@@ -104,6 +108,18 @@ public sealed partial class SettingsPage : Page
             UiLanguage.Sk => "Prihlásiť / obnoviť OneDrive",
             _ => "Sign in / refresh OneDrive"
         };
+        DemoDataSwitch.Header = lang switch
+        {
+            UiLanguage.Cs => "Ukázková data v knihovně",
+            UiLanguage.Sk => "Ukážkové dáta v knižnici",
+            _ => "Demo data in library"
+        };
+        SeedDemoButton.Content = lang switch
+        {
+            UiLanguage.Cs => "Načíst ukázková data teď",
+            UiLanguage.Sk => "Načítať ukážkové dáta teraz",
+            _ => "Load demo data now"
+        };
     }
 
     private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -153,6 +169,25 @@ public sealed partial class SettingsPage : Page
     {
         if (_loading) return;
         _vm.AutoUpload = AutoUploadSwitch.IsOn;
+    }
+
+    private void DemoDataSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _vm.DemoDataEnabled = DemoDataSwitch.IsOn;
+    }
+
+    private async void SeedDemoButton_Click(object sender, RoutedEventArgs e)
+    {
+        _vm.DemoDataEnabled = true;
+        DemoDataSwitch.IsOn = true;
+        var n = await DemoDataSeeder.SeedIfEnabledAsync(
+            _services.GetRequiredService<RecoraPaths>(),
+            _services.GetRequiredService<ICatalogRepository>(),
+            _services.GetRequiredService<SettingsStore>().Current).ConfigureAwait(true);
+        StatusText.Text = n > 0
+            ? $"Demo: +{n}"
+            : "Demo: already present / enabled";
     }
 
     private async void SignInButton_Click(object sender, RoutedEventArgs e)

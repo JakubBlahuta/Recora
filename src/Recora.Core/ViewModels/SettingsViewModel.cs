@@ -117,6 +117,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool DemoDataEnabled
+    {
+        get => _settings.Current.DemoDataEnabled;
+        set
+        {
+            _settings.Update(s => s.DemoDataEnabled = value);
+            OnPropertyChanged();
+        }
+    }
+
     public string AuthStatus { get; private set; } = "";
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -137,6 +147,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(FolderPath));
         OnPropertyChanged(nameof(AutoUpload));
         OnPropertyChanged(nameof(UseMsal));
+        OnPropertyChanged(nameof(DemoDataEnabled));
     }
 
     public async Task SignInAsync(CancellationToken ct = default)

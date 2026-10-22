@@ -1,5 +1,7 @@
 # Building Recora.App on Windows (VS 2022)
 
+Czech first-run walkthrough: [`windows-first-run.md`](./windows-first-run.md).
+
 ## 1. Install Visual Studio 2022
 
 Download [Visual Studio 2022](https://visualstudio.microsoft.com/) (Community is fine).

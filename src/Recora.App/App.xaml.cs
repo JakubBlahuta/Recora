@@ -3,7 +3,10 @@ using Microsoft.UI.Xaml;
 using Recora.App.Services;
 using Recora.App.Tray;
 using Recora.Cloud.Upload;
+using Recora.Core.Abstractions;
 using Recora.Core.Agent;
+using Recora.Core.Demo;
+using Recora.Core.Paths;
 using Recora.Core.Settings;
 
 namespace Recora.App;
@@ -28,8 +31,12 @@ public partial class App : Application
         var settings = _services.GetRequiredService<SettingsStore>();
         var agent = _services.GetRequiredService<RecordingAgent>();
         var upload = _services.GetRequiredService<UploadQueueWorker>();
+        var catalog = _services.GetRequiredService<ICatalogRepository>();
+        var paths = _services.GetRequiredService<RecoraPaths>();
 
         await agent.StartAsync().ConfigureAwait(true);
+        await DemoDataSeeder.SeedIfEnabledAsync(paths, catalog, settings.Current).ConfigureAwait(true);
+
         if (settings.Current.Cloud.AutoUpload)
             upload.Start();
 

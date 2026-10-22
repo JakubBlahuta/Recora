@@ -12,6 +12,13 @@ public sealed class AppSettings
     public string QualityProfile { get; set; } = nameof(Models.QualityProfile.SpeechFirst);
     public bool FirstRunCompleted { get; set; }
     public bool ConsentAccepted { get; set; }
+
+    /// <summary>
+    /// When true, seeds a couple of fixture meetings into the local library (idempotent).
+    /// Also enabled by env RECORA_DEMO_DATA=1. Safe for local-only demos; no network.
+    /// </summary>
+    public bool DemoDataEnabled { get; set; }
+
     public CaptureSettings Capture { get; set; } = new();
     public CloudSettings Cloud { get; set; } = new();
     public FormaSettings Forma { get; set; } = new();

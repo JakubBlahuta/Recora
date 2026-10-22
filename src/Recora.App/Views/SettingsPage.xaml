@@ -24,6 +24,8 @@
 
             <TextBox x:Name="FolderBox" Width="360" HorizontalAlignment="Left" LostFocus="FolderBox_LostFocus" />
             <ToggleSwitch x:Name="AutoUploadSwitch" Toggled="AutoUploadSwitch_Toggled" />
+            <ToggleSwitch x:Name="DemoDataSwitch" Toggled="DemoDataSwitch_Toggled" />
+            <Button x:Name="SeedDemoButton" Click="SeedDemoButton_Click" />
             <Button x:Name="SignInButton" Click="SignInButton_Click" />
             <TextBlock x:Name="StatusText" Foreground="#1FA88F" TextWrapping="Wrap" />
         </StackPanel>

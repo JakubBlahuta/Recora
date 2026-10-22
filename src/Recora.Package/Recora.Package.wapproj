@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Windows Application Packaging Project for per-user MSIX.
-  Open Recora.sln in Visual Studio 2022 on Windows, retarget if needed,
-  then Publish → Create App Packages (sideload / AppInstaller).
+  Per-user MSIX packaging project.
+  In Visual Studio 2022 (Windows): right-click → Publish → Create App Packages…
+  Requires the "Windows application development" workload (Desktop Bridge / MSIX).
 -->
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="Globals">
@@ -10,28 +10,44 @@
     <WapProjPath Condition="'$(WapProjPath)'==''">$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\</WapProjPath>
     <PathToXAMLWinRTImplementations>Recora.App\</PathToXAMLWinRTImplementations>
   </PropertyGroup>
+
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.props" Condition="Exists('$(WapProjPath)\Microsoft.DesktopBridge.props')" />
+
   <PropertyGroup>
     <ProjectName>Recora.Package</ProjectName>
+    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <DefaultLanguage>en-US</DefaultLanguage>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <EntryPointProjectUniqueName>..\Recora.App\Recora.App.csproj</EntryPointProjectUniqueName>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+    <AppxBundle>Always</AppxBundle>
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
-    <AppxPackageDir>..\..\artifacts\msix\</AppxPackageDir>
+    <AppxPackageDir>$(MSBuildThisFileDirectory)..\..\artifacts\msix\</AppxPackageDir>
+    <AppxPackageIncludePrivateSymbols>false</AppxPackageIncludePrivateSymbols>
   </PropertyGroup>
+
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
   </ItemGroup>
+
   <ItemGroup>
-    <Content Include="Images\**\*" />
+    <Content Include="Images\StoreLogo.png" />
+    <Content Include="Images\Square44x44Logo.png" />
+    <Content Include="Images\Square150x150Logo.png" />
+    <Content Include="Images\Wide310x150Logo.png" />
+    <Content Include="Images\SplashScreen.png" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Recora.App\Recora.App.csproj">
       <SkipGetTargetFrameworkProperties>True</SkipGetTargetFrameworkProperties>
+      <Publish>True</Publish>
     </ProjectReference>
   </ItemGroup>
+
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" Condition="Exists('$(WapProjPath)\Microsoft.DesktopBridge.targets')" />
 </Project>

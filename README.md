@@ -79,7 +79,8 @@ dotnet run --project src\Recora.App\Recora.App.csproj
 dotnet test Recora.Libraries.slnf -c Release
 ```
 
-Step-by-step VS workloads: [`docs/windows-build.md`](docs/windows-build.md).
+- First run (Czech): [`docs/windows-first-run.md`](docs/windows-first-run.md)  
+- VS workloads & MSIX: [`docs/windows-build.md`](docs/windows-build.md)
 
 ### MSIX (per-user, no admin)
 
