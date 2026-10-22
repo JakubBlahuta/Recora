@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="App.Name" xml:space="preserve"><value>Recora</value></data>
+  <data name="Library.Title" xml:space="preserve"><value>Knižnica nahrávok</value></data>
+  <data name="Settings.Title" xml:space="preserve"><value>Nastavenia</value></data>
+  <data name="Wizard.Title" xml:space="preserve"><value>Vitajte v Recora</value></data>
+  <data name="Tray.Recording" xml:space="preserve"><value>Recora — nahráva</value></data>
+</root>

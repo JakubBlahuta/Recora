@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Company>Recora</Company>
+    <Product>Recora</Product>
+    <Authors>Recora</Authors>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>
