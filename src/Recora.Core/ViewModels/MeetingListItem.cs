@@ -34,7 +34,9 @@ public sealed class MeetingListItem
                 ? $"{(int)dur.TotalHours}:{dur.Minutes:D2}:{dur.Seconds:D2}"
                 : $"{dur.Minutes}:{dur.Seconds:D2}",
             SizeLabel = FormatBytes(m.TotalBytes),
-            StatusLabel = StringCatalog.Get(statusKey, lang),
+            StatusLabel = string.IsNullOrWhiteSpace(m.ErrorMessage)
+                ? StringCatalog.Get(statusKey, lang)
+                : StringCatalog.Get(statusKey, lang) + " ⚠",
             LocalPath = m.LocalPath
         };
     }

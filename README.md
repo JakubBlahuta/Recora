@@ -142,8 +142,9 @@ Tokens always stay in `%LOCALAPPDATA%\Recora\config\secrets` via DPAPI — never
 | OneDrive queue + retry/backoff | **Works** with stub token |
 | WinUI wizard / library / settings | **Source complete** — build on Windows |
 | Tray (H.NotifyIcon) | **Source complete** — Windows |
-| WinRT Graphics Capture + real WASAPI PCM | **Armed / spike stubs** — bind COM on Windows |
-| Media Foundation / FFmpeg encode | **Stub** — deterministic placeholder until MF/FFmpeg |
+| WinRT Graphics Capture + WASAPI (Windows TFM) | **Implemented** behind `RECORA_WINDOWS` / live profile; fake on Linux |
+| Mic device picker | **WASAPI MMDevice list** on Windows; simulated off-Windows |
+| Chunk encode | **ffmpeg AAC** if on PATH / `RECORA_FFMPEG`; else **minimal playable MP4 stub** + UI warning |
 | MSAL interactive browser | **Gated** — needs `RECORA_MSAL_CLIENT_ID` + `useMsal` + Windows MSAL wire-up |
 
 ## CI notes

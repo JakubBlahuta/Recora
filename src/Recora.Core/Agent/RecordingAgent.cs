@@ -214,6 +214,8 @@ public sealed class RecordingAgent : IAsyncDisposable
         _capture = _captureFactory();
 
         _capture.GapDetected += OnCaptureGap;
+        _capture.PcmAvailable += OnCapturePcm;
+        _capture.FrameAvailable += OnCaptureFrame;
 
         await _capture.StartAsync(new CaptureStartRequest
         {
@@ -232,8 +234,12 @@ public sealed class RecordingAgent : IAsyncDisposable
     private void OnCaptureGap(object? sender, CaptureGapEventArgs e)
     {
         _logger?.LogWarning("Capture gap: {Reason}", e.Reason);
-        _ = _encoding?.TickAsync(); // keep clock moving; gap recorded by encoding bridge if supported
+        _ = _encoding?.TickAsync();
     }
+
+    private void OnCapturePcm(object? sender, CapturePcmEventArgs e) => _encoding?.OnPcm(e);
+
+    private void OnCaptureFrame(object? sender, CaptureFrameEventArgs e) => _encoding?.OnFrame(e);
 
     private async Task StopRecordingAsync(bool recovered, CancellationToken ct)
     {
@@ -243,6 +249,8 @@ public sealed class RecordingAgent : IAsyncDisposable
         if (_capture is not null)
         {
             _capture.GapDetected -= OnCaptureGap;
+            _capture.PcmAvailable -= OnCapturePcm;
+            _capture.FrameAvailable -= OnCaptureFrame;
             await _capture.StopAsync(ct).ConfigureAwait(false);
             await _capture.DisposeAsync().ConfigureAwait(false);
             _capture = null;
@@ -252,8 +260,10 @@ public sealed class RecordingAgent : IAsyncDisposable
         RaiseState();
 
         MeetingSidecar? sidecar = null;
+        string? encodeWarning = null;
         if (_encoding is not null)
         {
+            encodeWarning = _encoding.EncodeWarning;
             sidecar = await _encoding.FinalizeAsync(recovered, ct).ConfigureAwait(false);
             await _encoding.DisposeAsync().ConfigureAwait(false);
             _encoding = null;
@@ -265,6 +275,8 @@ public sealed class RecordingAgent : IAsyncDisposable
             _active.DurationSec = sidecar?.DurationSec ?? (_active.EndedAt.Value - _active.StartedAt).TotalSeconds;
             _active.Recovered = recovered;
             _active.Status = recovered ? MeetingStatus.Recovered : MeetingStatus.Local;
+            if (!string.IsNullOrWhiteSpace(encodeWarning))
+                _active.ErrorMessage = encodeWarning;
             if (sidecar is not null)
             {
                 _active.TotalBytes = SessionRecovery.SumChunkBytes(_active.LocalPath, sidecar);
@@ -330,6 +342,9 @@ public interface IActiveEncodingBridge : IAsyncDisposable
 {
     Task TickAsync(CancellationToken ct = default);
     Task<MeetingSidecar> FinalizeAsync(bool recovered, CancellationToken ct = default);
+    void OnPcm(CapturePcmEventArgs pcm);
+    void OnFrame(CaptureFrameEventArgs frame);
+    string? EncodeWarning { get; }
 }
 
 public static class EncodingSpaceGuard

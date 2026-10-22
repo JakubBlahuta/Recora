@@ -1,78 +1,114 @@
-# Recora — první spuštění na Windows
+# Recora — lokální běh na Windows (bez Cursor Remote Control)
 
-Krátký návod: otevřít řešení ve Visual Studio 2022, spustit F5 a ověřit tray + knihovnu **bez** Teams hovoru.
+Průvodce pro vývojáře: stáhnout PR větev, otevřít ve Visual Studio 2022, F5, otestovat force-record a nahlásit chyby. **Nepotřebujete** Cursor team Remote Control ani Azure client ID.
 
-## 1. Co nainstalovat
-
-1. [Visual Studio 2022](https://visualstudio.microsoft.com/) (Community stačí).
-2. Ve Visual Studio Installer zaškrtněte workloady:
-   - **.NET desktop development**
-   - **Windows application development** (WinUI / Windows App SDK / MSIX)
-3. .NET 8 SDK (součást workloadu).
-
-Podrobnosti: [`windows-build.md`](./windows-build.md).
-
-## 2. Otevřít a spustit
+## 1. Checkout PR větve
 
 ```powershell
 git clone https://github.com/JakubBlahuta/Recora.git
 cd Recora
+git fetch origin pull/1/head:pr-1
+git checkout pr-1
+# nebo: git checkout cursor/recora-mvp-scaffold-c642
+```
+
+PR: https://github.com/JakubBlahuta/Recora/pull/1
+
+## 2. Visual Studio 2022 — workloady
+
+Ve Visual Studio Installer:
+
+1. **.NET desktop development**
+2. **Windows application development** (WinUI / Windows App SDK / MSIX)
+
+Ověřte .NET 8 SDK a Windows 10/11 SDK (≥ 10.0.19041).
+
+## 3. Otevřít a F5
+
+```powershell
 start Recora.sln
 ```
 
-1. V Solution Exploreru klikněte pravým na **Recora.App** → **Set as Startup Project**.
-2. Nahoře zvolte konfiguraci **Debug** a platformu **x64** (ne Any CPU / x86).
-3. Profil spuštění: **Recora.App (unpackaged)** — už nastavuje `RECORA_FAKE_CAPTURE=1`.
-4. Stiskněte **F5**.
+1. Pravý klik na **Recora.App** → **Set as Startup Project**.
+2. Konfigurace **Debug**, platforma **x64** (ne Any CPU).
+3. Profil spuštění:
+   - **Recora.App (unpackaged)** — nastaví `RECORA_FAKE_CAPTURE=1` (bez Teams, falešný capture).
+   - **Recora.App (live capture)** — vypne fake; použije WinRT Graphics Capture + WASAPI (Teams okno + mic), pokud jsou dostupné.
+4. **F5**.
 
-Aplikace běží **bez instalace MSIX** (unpackaged). Balíček je projekt `Recora.Package` (až budete chtít sideload).
+Aplikace běží unpackaged (bez instalace MSIX).
 
-## 3. Co uvidíte
+## 4. První spuštění
 
-1. **Průvodce (first-run):** jazyk (CS/SK/EN) → souhlas → OneDrive (volitelné) → Hotovo.  
-   - OneDrive **nemusíte** přihlašovat. Bez Azure client ID stačí lokální režim (stub token / přeskočit).
-2. Po dokončení průvodce běží **ikona v systémové liště (tray)**.
-3. Z tray: **Otevřít knihovnu** / **Vynutit nahrávání** / **Zastavit** / **Ukončit**.
+1. Průvodce: jazyk (CS/SK/EN) → souhlas → OneDrive **lze přeskočit**.
+2. V systémové liště (tray) se objeví ikona Recora.
+3. Tray → **Otevřít knihovnu**.
 
-Data: `%LOCALAPPDATA%\Recora\` (`config\settings.json`, `data\catalog.db`, `data\recordings\`, `logs\`).
+### Kde leží soubory
 
-## 4. Test bez schůzky (force record)
+```
+%LOCALAPPDATA%\Recora\
+  config\settings.json
+  config\secrets\          # tokeny (DPAPI), pokud použijete stub OneDrive
+  data\catalog.db
+  data\recordings\<meetingId>\
+    chunk_000.mp4
+    meeting.json
+    chunks.jsonl
+  logs\tray-YYYYMMDD.log
+```
 
-Profil **unpackaged** už má fake capture. Postup:
+## 5. Test bez schůzky (force record)
 
-1. Tray → **Vynutit nahrávání** (Force record).  
-2. Počkejte pár sekund (tray stav „nahrává“).  
-3. Tray → **Zastavit**.  
-4. Otevřete knihovnu — měla by přibýt nahrávka se sidecar soubory (`meeting.json`, `chunks.jsonl`, `chunk_000.mp4`).
+### A) Fake režim (doporučeno napoprvé)
 
-Chunky jsou zatím **deterministické placeholdery** (ne přehrávatelný H.264) — ověřují pipeline a katalog, ne obraz/zvuk.
+Profil **unpackaged** (`RECORA_FAKE_CAPTURE=1`):
 
-### Ukázková data v knihovně
+1. Tray → **Vynutit nahrávání**.
+2. Počkejte 5–10 s.
+3. Tray → **Zastavit**.
+4. Knihovna ukáže nahrávku; na disku vzniknou chunk + sidecar.
 
-- **Nastavení** → zapněte **Ukázková data v knihovně** → **Načíst ukázková data teď**,  
-  nebo nastavte `"demoDataEnabled": true` v `settings.json`,  
-  nebo `$env:RECORA_DEMO_DATA = "1"` před spuštěním.  
-- Do katalogu se idempotentně přidají 2 demo meetingy (`demo-q3-sync`, `demo-standup`).
+### B) Live režim (Teams + mic)
 
-## 5. OneDrive (volitelné)
+1. Spusťte profil **live capture** (bez `RECORA_FAKE_CAPTURE`).
+2. Volitelně spusťte Teams a vstupte do hovoru (nebo force record).
+3. V **Nastavení** zvolte mikrofon (skutečný seznam WASAPI zařízení).
+4. Force record / auto-detect → Stop.
+5. Chunky:
+   - s **ffmpeg** na PATH (nebo `RECORA_FFMPEG`) → AAC MP4 (přehratelné, audio-first);
+   - bez ffmpeg → minimální přehratelný MP4 stub + varování v UI / `ErrorMessage` meetingu.
 
-- **Lokální režim (výchozí):** bez `RECORA_MSAL_CLIENT_ID` — nic se neodesílá do Microsoftu; fronta může běžet se stub tokenem.  
-- **Skutečný Graph upload:** až budete mít Azure App Registration (viz README) — nastavte client ID a `cloud.useMsal`. Teď to **není potřeba** pro F5 a knihovnu.
+```powershell
+# Volitelné — lepší encode
+winget install FFmpeg
+# nebo: $env:RECORA_FFMPEG = "C:\path\to\ffmpeg.exe"
+```
 
-## 6. Když něco selže
+### Ukázková data
 
-| Problém | Co zkusit |
-|---------|-----------|
-| Chybí Windows App SDK | Doinstalovat workload „Windows application development“, restart VS |
-| Build jen pro x86 / chyby RID | Solution platform **x64** |
-| Prázdná knihovna | Force record, nebo načíst demo data v Nastavení |
-| Tray nevidíte | Šipka „skryté ikony“ v oznamovací oblasti |
-| F5 nefunguje | Startup = Recora.App, unpackaged profil |
+Nastavení → **Ukázková data v knihovně** → **Načíst ukázková data teď**  
+(nebo `"demoDataEnabled": true` / `$env:RECORA_DEMO_DATA=1`).
 
-## 7. Co ještě nejde na tomto PC (očekávané)
+## 6. OneDrive (volitelné)
 
-- Ostrý WinRT Graphics Capture + WASAPI Teams/mic → až na Windows se zapnutým Teams.  
-- Skutečný H.264/AAC encode (Media Foundation / FFmpeg).  
-- Podepsaný MSIX sideload (projekt `Recora.Package` je připravený ve VS).
+Bez `RECORA_MSAL_CLIENT_ID` zůstává Recora **local-only** (stub token / nic se neodesílá). Azure app registration až později — viz README.
 
-Až projde F5 + force record + knihovna, jste hotovi s „open in VS and run“. Další krok je live capture/encode na Windows.
+## 7. Jak nahlásit bug
+
+Do issue / komentáře u PR #1 přiložte:
+
+1. Profil (fake vs live), OS (Win10/11), x64.
+2. Postup (force record / Teams call).
+3. Výřez logu: `%LOCALAPPDATA%\Recora\logs\tray-*.log` (bez obsahu hovoru).
+4. Zda existují `meeting.json` / `chunk_*.mp4` a zda jdou otevřít v přehrávači.
+5. Screenshot tray / knihovny / případné chybové hlášky encode.
+
+## 8. Co ještě není hotové
+
+- Plný video dump z Graphics Capture → H.264 (zatím audio-first / stub).
+- Per-process WASAPI loopback jen na `ms-teams.exe` (teď system loopback).
+- MSAL interaktivní OneDrive (čeká na client id).
+- Podepsaný MSIX sideload (`Recora.Package` ve VS → Publish).
+
+Podrobnosti buildu: [`windows-build.md`](./windows-build.md).

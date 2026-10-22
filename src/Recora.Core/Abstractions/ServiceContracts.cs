@@ -13,8 +13,27 @@ public interface ICaptureSession : IAsyncDisposable
     string MeetingId { get; }
     bool IsRunning { get; }
     event EventHandler<CaptureGapEventArgs>? GapDetected;
+    event EventHandler<CapturePcmEventArgs>? PcmAvailable;
+    event EventHandler<CaptureFrameEventArgs>? FrameAvailable;
     Task StartAsync(CaptureStartRequest request, CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
+}
+
+public sealed class CapturePcmEventArgs : EventArgs
+{
+    public double TimestampSec { get; set; }
+    public int SampleRate { get; init; }
+    public int Channels { get; init; }
+    public float[] Samples { get; init; } = [];
+    public bool Simulated { get; init; }
+}
+
+public sealed class CaptureFrameEventArgs : EventArgs
+{
+    public double TimestampSec { get; init; }
+    public int Width { get; init; }
+    public int Height { get; init; }
+    public bool Simulated { get; init; }
 }
 
 public sealed class CaptureStartRequest

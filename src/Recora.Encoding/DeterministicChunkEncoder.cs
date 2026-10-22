@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using System.Text;
 using Recora.Core.Abstractions;
 using Recora.Core.Agent;
 using Recora.Core.Models;
@@ -57,6 +56,10 @@ public sealed class DeterministicEncodingBridge : IActiveEncodingBridge
 
     public double ElapsedSec => _elapsed;
     public int ChunksWritten { get; private set; }
+    public string? EncodeWarning => null;
+
+    public void OnPcm(CapturePcmEventArgs pcm) { _ = pcm; }
+    public void OnFrame(CaptureFrameEventArgs frame) { _ = frame; }
 
     /// <summary>Advance virtual time (seconds) and rotate chunks as needed.</summary>
     public async Task AdvanceAsync(double deltaSec, CancellationToken ct = default)

@@ -54,7 +54,7 @@ public sealed class AppServices
             () => useFake ? new FakeCaptureSession() : _capture.CreateSession(),
             async request => useFake
                 ? await DeterministicEncodingHost.StartAsync(_encoding, request, _catalog).ConfigureAwait(false)
-                : await EncodingHost.StartBridgeAsync(_encoding, request).ConfigureAwait(false),
+                : await EncodingHost.StartBridgeAsync(_encoding, request, _catalog).ConfigureAwait(false),
             _loggerFactory.CreateLogger<RecordingAgent>());
 
         agent.DirectoryRecoverer = EncodingCoordinator.RecoverOrphanAsync;

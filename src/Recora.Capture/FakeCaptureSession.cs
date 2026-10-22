@@ -27,6 +27,8 @@ public sealed class FakeCaptureSession : ICaptureSession
     public int AudioPacketsEmitted { get; private set; }
 
     public event EventHandler<CaptureGapEventArgs>? GapDetected;
+    public event EventHandler<CapturePcmEventArgs>? PcmAvailable;
+    public event EventHandler<CaptureFrameEventArgs>? FrameAvailable;
     public event EventHandler<RawFrameEventArgs>? FrameCaptured;
     public event EventHandler<PcmAudioEventArgs>? AudioCaptured;
 
@@ -61,11 +63,26 @@ public sealed class FakeCaptureSession : ICaptureSession
                     Height = 720,
                     Simulated = true
                 });
+                FrameAvailable?.Invoke(this, new CaptureFrameEventArgs
+                {
+                    TimestampSec = elapsed,
+                    Width = 1280,
+                    Height = 720,
+                    Simulated = true
+                });
 
                 // 20 ms of silence stereo float samples (deterministic length)
                 var samples = new float[_sampleRate / 50 * 2];
                 AudioPacketsEmitted++;
                 AudioCaptured?.Invoke(this, new PcmAudioEventArgs
+                {
+                    TimestampSec = elapsed,
+                    SampleRate = _sampleRate,
+                    Channels = 2,
+                    Samples = samples,
+                    Simulated = true
+                });
+                PcmAvailable?.Invoke(this, new CapturePcmEventArgs
                 {
                     TimestampSec = elapsed,
                     SampleRate = _sampleRate,

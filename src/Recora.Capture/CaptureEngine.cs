@@ -43,6 +43,8 @@ public sealed class CaptureSession : ICaptureSession
     public string MeetingId { get; private set; } = "";
     public bool IsRunning { get; private set; }
     public event EventHandler<CaptureGapEventArgs>? GapDetected;
+    public event EventHandler<CapturePcmEventArgs>? PcmAvailable;
+    public event EventHandler<CaptureFrameEventArgs>? FrameAvailable;
     public event EventHandler<RawFrameEventArgs>? FrameCaptured;
     public event EventHandler<PcmAudioEventArgs>? AudioCaptured;
 
@@ -106,14 +108,27 @@ public sealed class CaptureSession : ICaptureSession
             {
                 if (useWindowsApis && graphics is not null)
                 {
-                    if (graphics.TryPullFrame(out var frame))
+                    if (graphics.TryPullFrame(out var pulled))
                     {
+                        var frame = new RawFrameEventArgs
+                        {
+                            TimestampSec = clock.Elapsed.TotalSeconds,
+                            Width = pulled.Width,
+                            Height = pulled.Height,
+                            Simulated = pulled.Simulated
+                        };
                         FrameCaptured?.Invoke(this, frame);
+                        FrameAvailable?.Invoke(this, new CaptureFrameEventArgs
+                        {
+                            TimestampSec = frame.TimestampSec,
+                            Width = frame.Width,
+                            Height = frame.Height,
+                            Simulated = frame.Simulated
+                        });
                     }
                     else if (graphics.WindowLost)
                     {
                         GapDetected?.Invoke(this, new CaptureGapEventArgs { Reason = "window_lost" });
-                        // Caller should re-bind; keep session alive.
                         graphics.TryRebind(_request.WindowHandle);
                     }
                 }
@@ -122,13 +137,29 @@ public sealed class CaptureSession : ICaptureSession
                 {
                     pcm.TimestampSec = clock.Elapsed.TotalSeconds;
                     AudioCaptured?.Invoke(this, pcm);
+                    PcmAvailable?.Invoke(this, new CapturePcmEventArgs
+                    {
+                        TimestampSec = pcm.TimestampSec,
+                        SampleRate = pcm.SampleRate,
+                        Channels = pcm.Channels,
+                        Samples = pcm.Samples,
+                        Simulated = pcm.Simulated
+                    });
                 }
                 else if (!useWindowsApis)
                 {
-                    // Dry-run heartbeat for non-Windows / no HWND
-                    AudioCaptured?.Invoke(this, new PcmAudioEventArgs
+                    var heartbeat = new PcmAudioEventArgs
                     {
                         TimestampSec = clock.Elapsed.TotalSeconds,
+                        SampleRate = 48000,
+                        Channels = 2,
+                        Samples = Array.Empty<float>(),
+                        Simulated = true
+                    };
+                    AudioCaptured?.Invoke(this, heartbeat);
+                    PcmAvailable?.Invoke(this, new CapturePcmEventArgs
+                    {
+                        TimestampSec = heartbeat.TimestampSec,
                         SampleRate = 48000,
                         Channels = 2,
                         Samples = Array.Empty<float>(),
