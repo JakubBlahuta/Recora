@@ -24,10 +24,15 @@
   </PropertyGroup>
 
   <!--
-    Do not add explicit PRIResource for Strings/**/*.resw — WindowsAppSDK / Msix.Pri.targets
-    already globs them (NETSDK1022 duplicate PRIResource if we Include again).
-    Assets: mark CopyToOutputDirectory without re-including as Content if SDK already did.
+    PRI / .resw — do NOT add <PRIResource Include="...">.
+    .NET SDK + WindowsAppSDK already glob **/*.resw via EnableDefaultPRIResourceItems
+    (default true). An explicit Include causes NETSDK1022 duplicate PRIResource.
+    Assets: Update (not Include) so we only set CopyToOutputDirectory.
   -->
+  <PropertyGroup>
+    <!-- Keep SDK default PRI globs; never pair this with an explicit PRIResource Include. -->
+    <EnableDefaultPRIResourceItems>true</EnableDefaultPRIResourceItems>
+  </PropertyGroup>
   <ItemGroup>
     <Content Update="Assets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
