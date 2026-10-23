@@ -1,0 +1,14 @@
+{
+  "solution": {
+    "path": "Recora.sln",
+    "projects": [
+      "src/Recora.Core/Recora.Core.csproj",
+      "src/Recora.Catalog/Recora.Catalog.csproj",
+      "src/Recora.Detection/Recora.Detection.csproj",
+      "src/Recora.Capture/Recora.Capture.csproj",
+      "src/Recora.Encoding/Recora.Encoding.csproj",
+      "src/Recora.Cloud/Recora.Cloud.csproj",
+      "tests/Recora.Core.Tests/Recora.Core.Tests.csproj"
+    ]
+  }
+}

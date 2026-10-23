@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="Recora.App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Recora brand tokens — deep teal + warm paper, not purple/cream AI defaults -->
+            <Color x:Key="RecoraInk">#0B1F24</Color>
+            <Color x:Key="RecoraTeal">#0F6B5C</Color>
+            <Color x:Key="RecoraTealBright">#1FA88F</Color>
+            <Color x:Key="RecoraSand">#E8E2D6</Color>
+            <Color x:Key="RecoraCoral">#C45C26</Color>
+            <SolidColorBrush x:Key="RecoraInkBrush" Color="{StaticResource RecoraInk}" />
+            <SolidColorBrush x:Key="RecoraTealBrush" Color="{StaticResource RecoraTeal}" />
+            <SolidColorBrush x:Key="RecoraSandBrush" Color="{StaticResource RecoraSand}" />
+            <SolidColorBrush x:Key="RecoraCoralBrush" Color="{StaticResource RecoraCoral}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

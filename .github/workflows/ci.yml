@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  libraries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Restore & test core libraries
+        run: |
+          # WinUI / WAP projects are Windows-only; use the libraries solution filter.
+          dotnet build Recora.Libraries.slnf -c Release
+          dotnet test tests/Recora.Core.Tests/Recora.Core.Tests.csproj -c Release --no-build --verbosity minimal
+
+  # Uncomment when a Windows self-hosted or hosted runner is available:
+  # winui:
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-dotnet@v4
+  #       with:
+  #         dotnet-version: "8.0.x"
+  #     - run: dotnet build src/Recora.App/Recora.App.csproj -c Release
