@@ -1,6 +1,5 @@
 #if RECORA_WINDOWS
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.Extensions.Logging;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
@@ -131,23 +130,57 @@ internal sealed partial class GraphicsCaptureHost
         _device = null;
     }
 
+    /// <summary>
+    /// Create GraphicsCaptureItem for an HWND via IGraphicsCaptureItemInterop.
+    /// Uses CsWinRT <see cref="ActivationFactory"/> + COM QI (not WindowsRuntimeMarshal).
+    /// </summary>
     private static GraphicsCaptureItem? CaptureItemForWindow(IntPtr hwnd)
     {
-        var factory = WindowsRuntimeMarshal.GetActivationFactory(typeof(GraphicsCaptureItem));
-        var interop = (IGraphicsCaptureItemInterop)factory;
-        var guid = typeof(GraphicsCaptureItem).GUID;
-        var abi = interop.CreateForWindow(hwnd, ref guid);
-        if (abi == IntPtr.Zero) return null;
-        return MarshalInspectable<GraphicsCaptureItem>.FromAbi(abi);
+        if (hwnd == IntPtr.Zero) return null;
+
+        try
+        {
+            var factory = ActivationFactory.Get("Windows.Graphics.Capture.GraphicsCaptureItem");
+            var unk = factory.ThisPtr;
+            var iidInterop = new Guid("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356"); // IGraphicsCaptureItemInterop
+            var qi = Marshal.QueryInterface(unk, ref iidInterop, out var interopPtr);
+            if (qi < 0 || interopPtr == IntPtr.Zero)
+                return null;
+
+            try
+            {
+                var interop = (IGraphicsCaptureItemInterop)Marshal.GetObjectForIUnknown(interopPtr);
+                // IID of Windows.Graphics.Capture.IGraphicsCaptureItem
+                var iidItem = new Guid("79C3F95B-31F7-4EC2-A464-632EF5D30754");
+                var hr = interop.CreateForWindow(hwnd, ref iidItem, out var abi);
+                if (hr < 0 || abi == IntPtr.Zero)
+                    return null;
+
+                return MarshalInspectable<GraphicsCaptureItem>.FromAbi(abi);
+            }
+            finally
+            {
+                Marshal.Release(interopPtr);
+            }
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 
+/// <summary>COM interop for HWND → GraphicsCaptureItem (Win10 1903+).</summary>
 [ComImport]
 [Guid("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IGraphicsCaptureItemInterop
 {
-    IntPtr CreateForWindow([In] IntPtr window, [In] ref Guid iid);
+    [PreserveSig]
+    int CreateForWindow(
+        IntPtr window,
+        ref Guid iid,
+        out IntPtr result);
 }
 
 internal static class Direct3D11Helper
@@ -169,7 +202,6 @@ internal static class Direct3D11Helper
         out int pFeatureLevel,
         out IntPtr ppImmediateContext);
 
-    // WinRT helper lives in Windows.Graphics.dll (not d3d11.dll)
     [DllImport("Windows.Graphics.dll", ExactSpelling = true, EntryPoint = "CreateDirect3D11DeviceFromDXGIDevice")]
     private static extern int CreateDirect3D11DeviceFromDXGIDevice(IntPtr dxgiDevice, out IntPtr graphicsDevice);
 

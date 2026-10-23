@@ -23,11 +23,15 @@
     <PlatformTarget Condition="'$(Platform)' == 'x64'">x64</PlatformTarget>
   </PropertyGroup>
 
+  <!--
+    Do not add explicit PRIResource for Strings/**/*.resw — WindowsAppSDK / Msix.Pri.targets
+    already globs them (NETSDK1022 duplicate PRIResource if we Include again).
+    Assets: mark CopyToOutputDirectory without re-including as Content if SDK already did.
+  -->
   <ItemGroup>
-    <Content Include="Assets\**\*">
+    <Content Update="Assets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <PRIResource Include="Strings\**\*.resw" />
   </ItemGroup>
 
   <ItemGroup>
